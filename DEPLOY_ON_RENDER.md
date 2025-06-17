@@ -12,6 +12,7 @@ The simplest way to deploy both services is using the included `render.yaml` blu
 4. Connect your GitHub repository
 5. Render will automatically detect the `render.yaml` file and create both services
 6. Review the settings and click "Apply"
+7. **Important**: The backend URL will automatically be passed to the frontend using Render's built-in service discovery
 
 ## Option 2: Manual Deployment
 

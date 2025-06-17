@@ -18,15 +18,12 @@ services:
   # Frontend service
   - type: web
     name: blood-donor-frontend
-    env: node
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npm run preview
+    env: node    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && node server.js
     envVars:
       - key: NODE_VERSION
-        value: 18.x
-      - key: VITE_API_URL
+        value: 18.x      - key: VITE_API_URL
         fromService:
           name: blood-donor-backend
           type: web
-          property: host
           envVarKey: RENDER_EXTERNAL_URL
