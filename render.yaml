@@ -5,6 +5,7 @@ services:
     env: python
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && gunicorn app:app
+    plan: free # Explicitly set to free tier
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
@@ -12,18 +13,15 @@ services:
         value: production
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
-        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "true"
 
-  # Frontend service
-  - type: web
+  # Frontend service as a static site (always on in free tier)
+  - type: static
     name: blood-donor-frontend
-    env: node
     buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && node server.js
+    publishDir: frontend/dist
     envVars:
-      - key: NODE_VERSION
-        value: 18.x
       - key: VITE_API_URL
         fromService:
           name: blood-donor-backend
