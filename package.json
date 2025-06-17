@@ -1,0 +1,25 @@
+{
+  "name": "blood-donor-full-stack",
+  "version": "1.0.0",
+  "description": "Blood Donor application with React frontend and Flask backend",
+  "main": "index.js",
+  "scripts": {
+    "setup": "cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:frontend": "cd frontend && npm run dev",
+    "start:backend": "cd backend && python app.py",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "blood-donation",
+    "react",
+    "flask",
+    "material-ui",
+    "tailwind"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

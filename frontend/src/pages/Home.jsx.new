@@ -1,0 +1,854 @@
+import { useEffect, useState } from 'react';
+import { 
+  Typography, 
+  Box, 
+  Container, 
+  Grid, 
+  Card, 
+  CardContent, 
+  Button, 
+  TextField, 
+  MenuItem, 
+  InputAdornment, 
+  Alert, 
+  Fade,
+  Paper,
+  Divider,
+  Chip,
+  useMediaQuery,
+  useTheme,
+  Stack
+} from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import PeopleIcon from '@mui/icons-material/People';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import VolunteerActivismIcon from '@mui/icons-material/VolunteerActivism';
+import DonorCard from '../components/DonorCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { bloodGroups } from '../utils/constants';
+import { donorService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+
+const Home = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const { isAuthenticated } = useAuth();
+  
+  const [donors, setDonors] = useState([]);
+  const [filteredDonors, setFilteredDonors] = useState([]);
+  const [searchParams, setSearchParams] = useState({
+    bloodGroup: '',
+    location: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    totalDonors: 0,
+    availableDonors: 0,
+    locations: 0
+  });
+
+  // Fetch donors data when component mounts
+  useEffect(() => {
+    const fetchDonors = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // In production, this would be a real API call
+        const response = await donorService.getAllDonors();
+        const donorsData = response.data || [];
+        
+        // Fallback to mock data if API returns empty
+        const finalDonors = donorsData.length > 0 ? donorsData : generateMockDonors();
+        
+        setDonors(finalDonors);
+        setFilteredDonors(finalDonors);
+        
+        // Calculate stats
+        calculateStats(finalDonors);
+      } catch (err) {
+        console.error('Error fetching donors:', err);
+        setError('Failed to fetch donors. Please try again later.');
+        
+        // Use mock data in case of error
+        const mockDonors = generateMockDonors();
+        setDonors(mockDonors);
+        setFilteredDonors(mockDonors);
+        calculateStats(mockDonors);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDonors();
+  }, []);
+  
+  // Generate mock donor data for development/demo purposes
+  const generateMockDonors = () => {
+    return [
+      { 
+        id: 1, 
+        name: 'John Doe', 
+        bloodGroup: 'A+', 
+        location: 'New York', 
+        coordinates: [40.7128, -74.0060],
+        lastDonated: '2025-05-10',
+        available: true,
+        contactNumber: '+1 (555) 123-4567'
+      },
+      { 
+        id: 2, 
+        name: 'Jane Smith', 
+        bloodGroup: 'O-', 
+        location: 'Los Angeles', 
+        coordinates: [34.0522, -118.2437],
+        lastDonated: '2025-04-22',
+        available: true,
+        contactNumber: '+1 (555) 234-5678'
+      },
+      { 
+        id: 3, 
+        name: 'Mike Johnson', 
+        bloodGroup: 'B+', 
+        location: 'Chicago', 
+        coordinates: [41.8781, -87.6298],
+        lastDonated: '2025-06-05',
+        available: false,
+        contactNumber: '+1 (555) 345-6789'
+      },
+      { 
+        id: 4, 
+        name: 'Sarah Williams', 
+        bloodGroup: 'AB+', 
+        location: 'Houston', 
+        coordinates: [29.7604, -95.3698],
+        lastDonated: '2025-03-15',
+        available: true,
+        contactNumber: '+1 (555) 456-7890'
+      },
+      { 
+        id: 5, 
+        name: 'David Brown', 
+        bloodGroup: 'A-', 
+        location: 'Phoenix', 
+        coordinates: [33.4484, -112.0740],
+        lastDonated: '2025-02-28',
+        available: true,
+        contactNumber: '+1 (555) 567-8901'
+      },
+      { 
+        id: 6, 
+        name: 'Emily Davis', 
+        bloodGroup: 'O+', 
+        location: 'Philadelphia', 
+        coordinates: [39.9526, -75.1652],
+        lastDonated: '2025-04-10',
+        available: true,
+        contactNumber: '+1 (555) 678-9012'
+      }
+    ];
+  };
+  
+  // Calculate statistics from donor data
+  const calculateStats = (donorData) => {
+    const uniqueLocations = new Set(donorData.map(donor => donor.location));
+    setStats({
+      totalDonors: donorData.length,
+      availableDonors: donorData.filter(donor => donor.available).length,
+      locations: uniqueLocations.size
+    });
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (e) => {
+    const { name, value } = e.target;
+    setSearchParams(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+  
+  // Apply search filters
+  const handleSearch = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // In a production app, we'd call the API with filters
+      const response = await donorService.getAllDonors({
+        bloodGroup: searchParams.bloodGroup,
+        location: searchParams.location
+      });
+      
+      // Use response data if available, otherwise filter client-side
+      if (response?.data) {
+        setFilteredDonors(response.data);
+      } else {
+        // Client-side filtering as fallback
+        const filtered = donors.filter(donor => {
+          const matchesBloodGroup = !searchParams.bloodGroup || 
+            donor.bloodGroup === searchParams.bloodGroup;
+            
+          const matchesLocation = !searchParams.location || 
+            donor.location.toLowerCase().includes(searchParams.location.toLowerCase());
+            
+          return matchesBloodGroup && matchesLocation;
+        });
+        
+        setFilteredDonors(filtered);
+      }
+    } catch (err) {
+      console.error('Error searching donors:', err);
+      setError('Failed to search donors. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reset search filters
+  const handleClearFilters = () => {
+    setSearchParams({
+      bloodGroup: '',
+      location: '',
+    });
+    setFilteredDonors(donors);
+  };
+
+  return (
+    <Box sx={{ overflowX: 'hidden' }}>
+      {/* Hero Section with Animated Background */}
+      <Box 
+        sx={{
+          position: 'relative',
+          bgcolor: 'primary.main',
+          color: 'white',
+          overflow: 'hidden',
+          pt: { xs: 10, md: 12 },
+          pb: { xs: 16, md: 20 }
+        }}
+      >
+        {/* Animated background elements */}
+        <Box sx={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0,
+          opacity: 0.1,
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            width: '40%',
+            height: '40%',
+            borderRadius: '50%',
+            background: 'white',
+            top: '10%',
+            right: '-5%',
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            width: '25%',
+            height: '25%',
+            borderRadius: '50%',
+            background: 'white',
+            bottom: '5%',
+            left: '-5%',
+          }
+        }} />
+        
+        {/* Hero Content */}
+        <Container maxWidth="xl">
+          <Grid container spacing={3} alignItems="center">
+            {/* Text Content */}
+            <Grid item xs={12} md={6} sx={{ position: 'relative', zIndex: 2 }}>
+              <Box sx={{ textAlign: { xs: 'center', md: 'left' } }}>
+                <Typography 
+                  variant="h1" 
+                  component="h1"
+                  sx={{ 
+                    fontWeight: 800, 
+                    fontSize: { xs: '2.5rem', sm: '3rem', md: '3.5rem', lg: '4rem' },
+                    mb: 2,
+                    lineHeight: 1.1,
+                    textShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  Give the Gift of Life
+                </Typography>
+                
+                <Typography 
+                  variant="h5"
+                  sx={{ 
+                    mb: 4, 
+                    opacity: 0.9,
+                    fontWeight: 400,
+                    fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' },
+                    maxWidth: { xs: '100%', md: '80%' }
+                  }}
+                >
+                  Connect with blood donors in your area and join our mission to save lives through blood donation.
+                </Typography>
+                
+                <Stack 
+                  direction={{ xs: 'column', sm: 'row' }} 
+                  spacing={{ xs: 2, sm: 3 }}
+                  sx={{ justifyContent: { xs: 'center', md: 'flex-start' } }}
+                >
+                  <Button 
+                    variant="contained" 
+                    size="large" 
+                    component={Link} 
+                    to="/register"
+                    color="secondary"
+                    sx={{ 
+                      py: 1.5,
+                      px: 4,
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      borderRadius: 2,
+                      boxShadow: 3,
+                      textTransform: 'none',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        transform: 'translateY(-3px)',
+                        boxShadow: 5
+                      }
+                    }}
+                  >
+                    Register as Donor
+                  </Button>
+                  
+                  <Button 
+                    variant="outlined" 
+                    size="large" 
+                    component={Link}
+                    to="/donor-map"
+                    sx={{ 
+                      py: 1.5,
+                      px: 4,
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                      borderRadius: 2,
+                      borderColor: 'white',
+                      color: 'white',
+                      borderWidth: 2,
+                      textTransform: 'none',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        borderColor: 'white',
+                        bgcolor: 'rgba(255,255,255,0.1)',
+                        transform: 'translateY(-3px)'
+                      }
+                    }}
+                  >
+                    Find Donors
+                  </Button>
+                </Stack>
+              </Box>
+            </Grid>
+            
+            {/* Hero Image/Icon */}
+            <Grid item xs={12} md={6} sx={{ position: 'relative', display: { xs: 'none', md: 'flex' }, justifyContent: 'center' }}>
+              <Box
+                sx={{
+                  position: 'relative',
+                  width: '340px',
+                  height: '340px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {/* Outer circle */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '340px',
+                    height: '340px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.15)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+                    animation: 'pulse 3s infinite',
+                    '@keyframes pulse': {
+                      '0%': { transform: 'scale(1)' },
+                      '50%': { transform: 'scale(1.05)' },
+                      '100%': { transform: 'scale(1)' }
+                    }
+                  }}
+                />
+                
+                {/* Middle circle */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '260px',
+                    height: '260px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.2)',
+                  }}
+                />
+                
+                {/* Inner circle with icon */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '200px',
+                    height: '200px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+                    zIndex: 1
+                  }}
+                >
+                  <FavoriteIcon
+                    color="primary"
+                    sx={{
+                      fontSize: '100px',
+                      animation: 'heartbeat 1.5s ease infinite',
+                      '@keyframes heartbeat': {
+                        '0%': { transform: 'scale(1)' },
+                        '14%': { transform: 'scale(1.1)' },
+                        '28%': { transform: 'scale(1)' },
+                        '42%': { transform: 'scale(1.1)' },
+                        '70%': { transform: 'scale(1)' }
+                      }
+                    }}
+                  />
+                </Box>
+                
+                {/* Decorative circles */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.2)',
+                    top: '10%',
+                    left: '0%',
+                  }}
+                />
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.2)',
+                    bottom: '15%',
+                    right: '5%',
+                  }}
+                />
+              </Box>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+      
+      {/* Stats Section */}
+      <Container maxWidth="lg" sx={{ mt: { xs: -8, md: -10 }, position: 'relative', zIndex: 10 }}>
+        <Paper 
+          elevation={4} 
+          sx={{ 
+            borderRadius: 4,
+            overflow: 'hidden'
+          }}
+        >
+          <Grid container>
+            {/* Total Donors Stat */}
+            <Grid item xs={12} md={4} 
+              sx={{
+                position: 'relative',
+                py: { xs: 3, md: 5 },
+                '&::after': {
+                  content: { xs: '""', md: '""' },
+                  position: 'absolute',
+                  right: { xs: 'auto', md: 0 },
+                  bottom: { xs: 0, md: '15%' },
+                  left: { xs: '10%', md: 'auto' },
+                  width: { xs: '80%', md: '1px' },
+                  height: { xs: '1px', md: '70%' },
+                  backgroundColor: 'rgba(0,0,0,0.1)'
+                }
+              }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography 
+                  variant="h2" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    color: 'primary.main',
+                    fontSize: { xs: '2.5rem', md: '3rem' },
+                    mb: 1
+                  }}
+                >
+                  {stats.totalDonors}
+                </Typography>
+                <Typography variant="h6" color="textSecondary" sx={{ fontWeight: 500 }}>
+                  Total Donors
+                </Typography>
+              </Box>
+            </Grid>
+            
+            {/* Available Donors Stat */}
+            <Grid item xs={12} md={4} 
+              sx={{
+                position: 'relative',
+                py: { xs: 3, md: 5 },
+                bgcolor: { xs: 'rgba(0,0,0,0.02)', md: 'transparent' },
+                '&::after': {
+                  content: { xs: '""', md: '""' },
+                  position: 'absolute',
+                  right: { xs: 'auto', md: 0 },
+                  bottom: { xs: 0, md: '15%' },
+                  left: { xs: '10%', md: 'auto' },
+                  width: { xs: '80%', md: '1px' },
+                  height: { xs: '1px', md: '70%' },
+                  backgroundColor: 'rgba(0,0,0,0.1)'
+                }
+              }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography 
+                  variant="h2" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    color: 'primary.main',
+                    fontSize: { xs: '2.5rem', md: '3rem' },
+                    mb: 1
+                  }}
+                >
+                  {stats.availableDonors}
+                </Typography>
+                <Typography variant="h6" color="textSecondary" sx={{ fontWeight: 500 }}>
+                  Available Now
+                </Typography>
+              </Box>
+            </Grid>
+            
+            {/* Locations Stat */}
+            <Grid item xs={12} md={4} sx={{ py: { xs: 3, md: 5 } }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography 
+                  variant="h2" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    color: 'primary.main',
+                    fontSize: { xs: '2.5rem', md: '3rem' },
+                    mb: 1
+                  }}
+                >
+                  {stats.locations}
+                </Typography>
+                <Typography variant="h6" color="textSecondary" sx={{ fontWeight: 500 }}>
+                  Locations
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
+      </Container>
+      
+      {/* Search & Donors Section */}
+      <Box sx={{ py: { xs: 10, md: 12 }, bgcolor: 'grey.50' }}>
+        <Container maxWidth="lg">
+          {/* Search Section */}
+          <Typography 
+            variant="h4" 
+            component="h2" 
+            sx={{ 
+              fontWeight: 700, 
+              mb: 4,
+              textAlign: { xs: 'center', md: 'left' }
+            }}
+          >
+            Find Blood Donors Near You
+          </Typography>
+          
+          <Paper 
+            elevation={2} 
+            sx={{ 
+              borderRadius: 3,
+              mb: 6,
+              boxShadow: '0 3px 15px rgba(0,0,0,0.07)',
+              p: { xs: 2, md: 3 }
+            }}
+          >
+            <Grid container spacing={3} alignItems="center">
+              {/* Blood Group Filter */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Blood Group"
+                  name="bloodGroup"
+                  value={searchParams.bloodGroup}
+                  onChange={handleSearchChange}
+                  variant="outlined"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocalHospitalIcon color="primary" />
+                      </InputAdornment>
+                    ),
+                  }}
+                >
+                  <MenuItem value="">Any Blood Group</MenuItem>
+                  {bloodGroups.map((group) => (
+                    <MenuItem key={group} value={group}>
+                      {group}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              
+              {/* Location Filter */}
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  label="Location / City"
+                  name="location"
+                  value={searchParams.location}
+                  onChange={handleSearchChange}
+                  variant="outlined"
+                  placeholder="Enter city name"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <LocationOnIcon color="primary" />
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Grid>
+              
+              {/* Search Buttons */}
+              <Grid item xs={12} md={4}>
+                <Stack 
+                  direction="row" 
+                  spacing={2} 
+                  sx={{ width: '100%' }}
+                >
+                  <Button 
+                    variant="contained" 
+                    color="primary" 
+                    fullWidth
+                    onClick={handleSearch}
+                    startIcon={<SearchIcon />}
+                    sx={{ 
+                      py: 1.5, 
+                      fontWeight: 600,
+                      boxShadow: 2
+                    }}
+                  >
+                    Search Donors
+                  </Button>
+                  <Button 
+                    variant="outlined"
+                    onClick={handleClearFilters}
+                    sx={{ minWidth: '80px' }}
+                  >
+                    Clear
+                  </Button>
+                </Stack>
+              </Grid>
+            </Grid>
+          </Paper>
+          
+          {/* Donors List Section */}
+          <Box>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                justifyContent: 'space-between', 
+                alignItems: { xs: 'center', sm: 'center' },
+                mb: 4,
+                gap: 2
+              }}
+            >
+              <Typography 
+                variant="h5" 
+                component="h3" 
+                sx={{ 
+                  fontWeight: 700,
+                  textAlign: { xs: 'center', sm: 'left' }
+                }}
+              >
+                Available Donors
+              </Typography>
+              
+              {!loading && (
+                <Chip 
+                  label={`${filteredDonors.length} ${filteredDonors.length === 1 ? 'Donor' : 'Donors'}`} 
+                  color="primary" 
+                  variant="outlined"
+                  sx={{ fontWeight: 500 }} 
+                />
+              )}
+            </Box>
+
+            {error && (
+              <Fade in={true}>
+                <Alert 
+                  severity="error" 
+                  sx={{ mb: 4, borderRadius: 2 }}
+                  onClose={() => setError(null)}
+                >
+                  {error}
+                </Alert>
+              </Fade>
+            )}
+
+            {loading ? (
+              <Box sx={{ py: 8, textAlign: 'center' }}>
+                <LoadingSpinner message="Searching for donors..." size={60} />
+              </Box>
+            ) : filteredDonors.length > 0 ? (
+              <Grid container spacing={3}>
+                {filteredDonors.map((donor) => (
+                  <Grid item xs={12} sm={6} md={4} key={donor.id}>
+                    <DonorCard donor={donor} />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Paper 
+                sx={{ 
+                  py: { xs: 6, md: 10 }, 
+                  textAlign: 'center',
+                  borderRadius: 3,
+                  border: '1px dashed rgba(0,0,0,0.1)',
+                  bgcolor: 'background.paper'
+                }}
+              >
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', px: 3 }}>
+                  <PeopleIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" sx={{ mb: 2, fontWeight: 500 }}>
+                    No donors matching your criteria
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 'md', mx: 'auto' }}>
+                    Try adjusting your search parameters or check back later as new donors register.
+                  </Typography>
+                </Box>
+              </Paper>
+            )}
+          </Box>
+          
+          {/* Call to Action Section */}
+          <Box 
+            sx={{ 
+              mt: { xs: 8, md: 12 },
+              py: { xs: 6, md: 8 },
+              px: { xs: 3, md: 6 },
+              borderRadius: 4,
+              background: 'linear-gradient(45deg, #feb2b2 0%, #e53e3e 100%)',
+              color: 'white',
+              position: 'relative',
+              overflow: 'hidden',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(229, 62, 62, 0.15)'
+            }}
+          >
+            {/* Background decoration */}
+            <Box sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              overflow: 'hidden',
+              zIndex: 0,
+              opacity: 0.3,
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                width: '300px',
+                height: '300px',
+                borderRadius: '50%',
+                background: 'white',
+                top: '-120px',
+                right: '-50px',
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                width: '200px',
+                height: '200px',
+                borderRadius: '50%',
+                background: 'white',
+                bottom: '-80px',
+                left: '-50px',
+              }
+            }} />
+            
+            {/* Content */}
+            <Box sx={{ position: 'relative', zIndex: 1, maxWidth: '800px', mx: 'auto' }}>
+              <Typography 
+                variant="h3" 
+                component="h2" 
+                sx={{ 
+                  mb: 2, 
+                  fontWeight: 700,
+                  fontSize: { xs: '1.75rem', sm: '2rem', md: '2.5rem' },
+                  textShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                }}
+              >
+                Become a Donor Today
+              </Typography>
+              
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  mb: 5, 
+                  fontWeight: 400,
+                  opacity: 0.9,
+                  fontSize: { xs: '1rem', md: '1.25rem' }
+                }}
+              >
+                Your donation can save up to three lives. Join our community of blood donors and make a difference.
+              </Typography>
+              
+              <Button 
+                variant="contained" 
+                size="large" 
+                component={Link} 
+                to={isAuthenticated ? "/profile" : "/register"}
+                sx={{ 
+                  bgcolor: 'white', 
+                  color: 'primary.main',
+                  py: 2,
+                  px: 5,
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  boxShadow: '0 5px 15px rgba(0,0,0,0.1)',
+                  textTransform: 'none',
+                  '&:hover': { 
+                    bgcolor: 'white',
+                    transform: 'translateY(-3px)',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {isAuthenticated ? 'Update Profile' : 'Register as Donor'}
+              </Button>
+            </Box>
+          </Box>
+        </Container>
+      </Box>
+    </Box>
+  );
+};
+
+export default Home;
