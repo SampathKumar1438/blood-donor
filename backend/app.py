@@ -9,9 +9,11 @@ import uuid
 
 app = Flask(__name__)
 # Configure CORS to allow requests from the frontend
+# In production, this will accept requests from the Render-hosted frontend
+# In development, we still allow localhost requests
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "origins": ["*"],  # Allow all origins in production
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
